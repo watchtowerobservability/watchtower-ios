@@ -13,7 +13,7 @@ jobs:
   release:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: swift test
       - run: git archive --format=zip -o watchtower-ios-$GITHUB_REF_NAME.zip HEAD
       - uses: actions/attest-build-provenance@v2
