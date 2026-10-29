@@ -1,5 +1,7 @@
 # Watchtower (Swift)
 
+[![CI](https://github.com/watchtowerobservability/watchtower-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/watchtowerobservability/watchtower-ios/actions/workflows/ci.yml)
+
 Watchtower SDK for iOS: crashes, hangs, app start, slow/frozen frames, RUM batches and screenshot replay that masks text and inputs by default, with an offline buffer.
 
 Status: 0.x, early. APIs may change between minor versions.
