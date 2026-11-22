@@ -2,35 +2,35 @@ import XCTest
 @testable import Watchtower
 
 final class MobileRumTests: XCTestCase {
-    private func run(fg: Bool = true) -> RunState {
+    private func state(fg: Bool = true) -> RunState {
         var r = RunState(session: "s1", last: 50, appVersion: "1.0+1", osVersion: "17.4", bootTime: 10)
         r.foreground = fg
         return r
     }
 
     func testUnexplainedTerminationIsOomInForegroundAndWatchdogInBackground() {
-        let now = run()
-        XCTAssertEqual(SessionEnd.reason(previous: run(), now: now, crashReport: false), "oom")
-        XCTAssertEqual(SessionEnd.reason(previous: run(fg: false), now: now, crashReport: false), "watchdog")
-        var hung = run(); hung.hanging = true
+        let now = state()
+        XCTAssertEqual(SessionEnd.reason(previous: state(), now: now, crashReport: false), "oom")
+        XCTAssertEqual(SessionEnd.reason(previous: state(fg: false), now: now, crashReport: false), "watchdog")
+        var hung = state(); hung.hanging = true
         XCTAssertEqual(SessionEnd.reason(previous: hung, now: now, crashReport: false), "watchdog")
-        XCTAssertEqual(SessionEnd.errorFor("oom", run())?.attrs["crash.class"] as? String, "oom")
+        XCTAssertEqual(SessionEnd.errorFor("oom", state())?.attrs["crash.class"] as? String, "oom")
         XCTAssertEqual(SessionEnd.errorFor("watchdog", hung)?.name, "WatchdogTermination")
-        XCTAssertNil(SessionEnd.errorFor("watchdog", run(fg: false)), "background kills include force-quits")
+        XCTAssertNil(SessionEnd.errorFor("watchdog", state(fg: false)), "background kills include force-quits")
     }
 
     func testCrashUpgradeRebootAndCleanExitAreNotOom() {
-        let now = run()
-        XCTAssertEqual(SessionEnd.reason(previous: run(), now: now, crashReport: true), "crash")
-        var ex = run(); ex.crashed = true
+        let now = state()
+        XCTAssertEqual(SessionEnd.reason(previous: state(), now: now, crashReport: true), "crash")
+        var ex = state(); ex.crashed = true
         XCTAssertEqual(SessionEnd.reason(previous: ex, now: now, crashReport: false), "crash")
-        var clean = run(); clean.cleanExit = true
+        var clean = state(); clean.cleanExit = true
         XCTAssertEqual(SessionEnd.reason(previous: clean, now: now, crashReport: false), "user_exit")
         var upgraded = now; upgraded.appVersion = "1.1+2"
-        XCTAssertEqual(SessionEnd.reason(previous: run(), now: upgraded, crashReport: false), "user_exit")
+        XCTAssertEqual(SessionEnd.reason(previous: state(), now: upgraded, crashReport: false), "user_exit")
         var rebooted = now; rebooted.bootTime = 900
-        XCTAssertEqual(SessionEnd.reason(previous: run(fg: false), now: rebooted, crashReport: false), "background_timeout")
-        let end = SessionEnd.endEvent("oom", run()).json()
+        XCTAssertEqual(SessionEnd.reason(previous: state(fg: false), now: rebooted, crashReport: false), "background_timeout")
+        let end = SessionEnd.endEvent("oom", state()).json()
         XCTAssertEqual(end["type"] as? String, "action")
         XCTAssertEqual((end["attrs"] as? [String: Any])?["session.end_reason"] as? String, "oom")
         XCTAssertEqual(end["ts_ns"] as? Int64, 50_000_000_000)
@@ -38,9 +38,9 @@ final class MobileRumTests: XCTestCase {
 
     func testRunStateSurvivesTheNextLaunch() {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        XCTAssertNil(Run.start(dir, run()))
+        XCTAssertNil(Run.start(dir, state()))
         Run.update { $0.hanging = true }
-        let prev = Run.start(dir, run())
+        let prev = Run.start(dir, state())
         XCTAssertEqual(prev?.session, "s1")
         XCTAssertEqual(prev?.hanging, true)
         try? FileManager.default.removeItem(at: dir)
@@ -90,14 +90,14 @@ final class MobileRumTests: XCTestCase {
     }
 
     func testLaunchCrashesCountUntilARunSurvivesTheWindow() {
-        var p = run(); p.launchedAt = 48; p.crashed = true // crashed 2 s after start
+        var p = state(); p.launchedAt = 48; p.crashed = true // crashed 2 s after start
         XCTAssertEqual(CrashLoop.count(previous: p, crashed: true), 1)
         p.launchCrashes = 2
         XCTAssertEqual(CrashLoop.count(previous: p, crashed: true), 3)
         XCTAssertEqual(CrashLoop.count(previous: p, crashed: false), 0, "a run that did not crash resets")
         p.launchedAt = 40 // crashed 10 s in: past the window
         XCTAssertEqual(CrashLoop.count(previous: p, crashed: true), 0)
-        XCTAssertEqual(CrashLoop.count(previous: run(), crashed: true), 0, "older state without launchedAt")
+        XCTAssertEqual(CrashLoop.count(previous: state(), crashed: true), 0, "older state without launchedAt")
         XCTAssertEqual(CrashLoop.count(previous: nil, crashed: true), 0)
     }
 
