@@ -169,6 +169,9 @@ extension NSManagedObjectContext {
     func wt_execute(_ request: NSPersistentStoreRequest) throws -> NSPersistentStoreResult {
         let entity = (request as? NSBatchDeleteRequest)?.fetchRequest.entityName
             ?? (request as? NSBatchUpdateRequest)?.entityName ?? (request as? NSBatchInsertRequest)?.entityName
+        // Newer Core Data routes fetch and save through executeRequest: (fetch and save requests); those are
+        // already timed as "fetch"/"save", so only batch requests are recorded here, as the doc says.
+        guard request is NSBatchDeleteRequest || request is NSBatchUpdateRequest || request is NSBatchInsertRequest else { return try wt_execute(request) }
         return try Datastore.measure("coredata", "execute", collection: entity, namespace: wtStoreName) { try wt_execute(request) }
     }
 
