@@ -7,18 +7,20 @@ import UIKit
 /// that painting. The edge drops the image of any frame that is not marked masked.
 enum Replay {
     private static var timer: Timer?
+    private static let encoder = WireframeEncoder()
 
     static func install(_ c: ReplayConfig, _ wt: Watchtower) {
         DispatchQueue.main.async {
             timer = Timer.scheduledTimer(withTimeInterval: c.interval, repeats: true) { _ in
-                guard let w = UIApplication.shared.windows.first(where: { $0.isKeyWindow }),
-                      let ev = capture(w, c) else { return }
+                guard let w = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
+                let shot = c.mode == .wireframe ? wireframe(w, c) : capture(w, c)
+                guard let ev = shot else { return }
                 wt.postReplay([ev])
             }
         }
     }
 
-    private static func kind(_ v: UIView) -> Kind {
+    static func kind(_ v: UIView) -> Kind {
         if let t = v as? UITextField { return t.isSecureTextEntry ? .secure : .input }
         if let t = v as? UITextView { return t.isSecureTextEntry ? .secure : .input }
         if v is UILabel || v is UIButton { return .text }
@@ -32,6 +34,13 @@ enum Replay {
         let tag = v.accessibilityIdentifier
         return Node(kind(v), Int(f.minX), Int(f.minY), Int(f.width), Int(f.height),
                     unmask: tag == "wt-unmask", forceMask: tag == "wt-mask", children: kids)
+    }
+
+    /// The view hierarchy as a `wt.wireframe` event (full or diff); nil when nothing changed.
+    static func wireframe(_ root: UIView, _ c: ReplayConfig) -> [String: Any]? {
+        guard root.bounds.width > 0, root.bounds.height > 0 else { return nil }
+        return encoder.encode(nodes: WireframeCapture.nodes(root, c), w: Int(root.bounds.width), h: Int(root.bounds.height),
+                              screen: String(describing: type(of: root)), tsMs: Int64(Date().timeIntervalSince1970 * 1000))
     }
 
     static func capture(_ root: UIView, _ c: ReplayConfig) -> [String: Any]? {

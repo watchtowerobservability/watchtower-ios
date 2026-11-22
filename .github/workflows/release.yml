@@ -23,3 +23,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" watchtower-ios-*.zip --generate-notes --verify-tag
+      # CocoaPods trunk: runs only when the owner has set COCOAPODS_TRUNK_TOKEN. SwiftPM needs
+      # nothing here: the v* tag on this repository is the release.
+      - name: CocoaPods trunk
+        if: ${{ env.COCOAPODS_TRUNK_TOKEN != '' }}
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+        run: |
+          if [ -z "$COCOAPODS_TRUNK_TOKEN" ]; then echo "COCOAPODS_TRUNK_TOKEN not set; skipping"; exit 0; fi
+          sed -i '' "s/s.version .*/s.version       = '${GITHUB_REF_NAME#v}'/" WatchtowerSDK.podspec
+          pod trunk push WatchtowerSDK.podspec --allow-warnings
